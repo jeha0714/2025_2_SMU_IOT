@@ -1,0 +1,383 @@
+/* 슬라이드 인 애니메이션 */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 비 내리는 애니메이션 */
+@keyframes rainfall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(300px);
+    opacity: 0;
+  }
+}
+
+/* 미세먼지 떠다니는 애니메이션 */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+  50% {
+    transform: translateY(-10px) translateX(5px);
+  }
+}
+
+/* 열기 파동 애니메이션 */
+@keyframes heatwave {
+  0%,
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(-20px) scaleY(1.2);
+    opacity: 0.3;
+  }
+}
+
+/* 물방울 떨어지는 애니메이션 */
+@keyframes drip {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(300px);
+    opacity: 0;
+  }
+}
+
+/* 애니메이션 클래스 */
+.animate-slide-in {
+  animation: slideIn 0.5s ease-out;
+}
+
+.animate-rainfall {
+  animation: rainfall 1s linear infinite;
+}
+
+.animate-float {
+  animation: float ease-in-out infinite;
+}
+
+.animate-heatwave {
+  animation: heatwave ease-in-out infinite;
+}
+
+.animate-drip {
+  animation: drip linear infinite;
+}
+
+/* 창문 열림/닫힘 상태 */
+.window-closed {
+  width: 50%;
+  /* opacity: 1; */
+}
+
+.window-open {
+  width: 0%;
+  /* opacity: 0; */
+}
+
+/* 빗줄기 위치 및 애니메이션 */
+.rain-drop-0 {
+  left: 5%;
+  top: -20px;
+  animation-delay: 0s;
+}
+.rain-drop-1 {
+  left: 12%;
+  top: -20px;
+  animation-delay: 0.1s;
+}
+.rain-drop-2 {
+  left: 19%;
+  top: -20px;
+  animation-delay: 0.2s;
+}
+.rain-drop-3 {
+  left: 26%;
+  top: -20px;
+  animation-delay: 0.3s;
+}
+.rain-drop-4 {
+  left: 33%;
+  top: -20px;
+  animation-delay: 0.4s;
+}
+.rain-drop-5 {
+  left: 40%;
+  top: -20px;
+  animation-delay: 0.5s;
+}
+.rain-drop-6 {
+  left: 47%;
+  top: -20px;
+  animation-delay: 0.6s;
+}
+.rain-drop-7 {
+  left: 54%;
+  top: -20px;
+  animation-delay: 0.7s;
+}
+.rain-drop-8 {
+  left: 61%;
+  top: -20px;
+  animation-delay: 0.8s;
+}
+.rain-drop-9 {
+  left: 68%;
+  top: -20px;
+  animation-delay: 0.9s;
+}
+.rain-drop-10 {
+  left: 75%;
+  top: -20px;
+  animation-delay: 1s;
+}
+.rain-drop-11 {
+  left: 82%;
+  top: -20px;
+  animation-delay: 1.1s;
+}
+.rain-drop-12 {
+  left: 89%;
+  top: -20px;
+  animation-delay: 1.2s;
+}
+.rain-drop-13 {
+  left: 96%;
+  top: -20px;
+  animation-delay: 1.3s;
+}
+.rain-drop-14 {
+  left: 103%;
+  top: -20px;
+  animation-delay: 1.4s;
+}
+
+/* 바람 효과 */
+.wind-line-0 {
+  animation-delay: 0s;
+  animation-duration: 2s;
+}
+
+.wind-line-1 {
+  animation-delay: 0.3s;
+  animation-duration: 2.2s;
+}
+
+.wind-line-2 {
+  animation-delay: 0.6s;
+  animation-duration: 2.4s;
+}
+
+.wind-line-3 {
+  animation-delay: 0.9s;
+  animation-duration: 2.6s;
+}
+
+/* 강한 빛 광선 회전 */
+.light-ray-0 {
+  transform: rotate(0deg) translateY(-50%);
+}
+.light-ray-1 {
+  transform: rotate(45deg) translateY(-50%);
+}
+.light-ray-2 {
+  transform: rotate(90deg) translateY(-50%);
+}
+.light-ray-3 {
+  transform: rotate(135deg) translateY(-50%);
+}
+.light-ray-4 {
+  transform: rotate(180deg) translateY(-50%);
+}
+.light-ray-5 {
+  transform: rotate(225deg) translateY(-50%);
+}
+.light-ray-6 {
+  transform: rotate(270deg) translateY(-50%);
+}
+.light-ray-7 {
+  transform: rotate(315deg) translateY(-50%);
+}
+
+.light-ray-rotate {
+  transform-origin: center;
+  animation-duration: 20s;
+}
+
+@keyframes blindGlow {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0.2);
+  }
+}
+
+.blind-scene {
+  position: relative;
+  width: 24rem;
+  max-width: 100%;
+  height: 18rem;
+  border-radius: 1rem;
+  border: 8px solid #374151;
+  overflow: hidden;
+  background: linear-gradient(180deg, #1f2937, #0f172a);
+  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.4);
+}
+
+.blind-view {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #4c6793, #1b2a44 65%, #0f172a);
+}
+
+.blind-view::before,
+.blind-view::after {
+  content: "";
+  position: absolute;
+  width: 160px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 60px;
+  filter: blur(1px);
+}
+
+.blind-view::before {
+  top: 30px;
+  left: 40px;
+}
+
+.blind-view::after {
+  top: 70px;
+  right: 30px;
+}
+
+.blind-cityline {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 55px;
+  background: linear-gradient(180deg, rgba(12, 18, 30, 0), rgba(12, 18, 30, 1));
+}
+
+.blind-panel {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(226, 232, 240, 0.95) 0,
+    rgba(226, 232, 240, 0.95) 14px,
+    rgba(203, 213, 225, 0.95) 14px,
+    rgba(203, 213, 225, 0.95) 28px
+  );
+  border-bottom: 4px solid rgba(55, 65, 81, 0.5);
+  transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1);
+  box-shadow: inset 0 -10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.blind-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.15),
+    transparent 40%,
+    transparent 60%,
+    rgba(255, 255, 255, 0.15)
+  );
+}
+
+.blind-panel-open {
+  transform: translateY(-88%);
+}
+
+.blind-panel-closed {
+  transform: translateY(0);
+}
+
+.blind-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 10%,
+    rgba(255, 255, 255, 0.35),
+    transparent 55%
+  );
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.blind-overlay-open {
+  opacity: 1;
+  animation: blindGlow 3s ease-in-out infinite;
+}
+
+.blind-cord {
+  position: absolute;
+  top: 10px;
+  right: 26px;
+  width: 3px;
+  height: 160px;
+  background: linear-gradient(180deg, #cbd5f5, #6b75ac);
+  border-radius: 999px;
+  transition: height 0.8s ease, transform 0.8s ease;
+}
+
+.blind-cord::after {
+  content: "";
+  position: absolute;
+  bottom: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  border: 2px solid #94a3b8;
+}
+
+.blind-cord-open {
+  height: 110px;
+  transform: translateY(10px);
+}
+
+.blind-status-chip {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: rgba(15, 23, 42, 0.65);
+  color: #e0e7ff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+}

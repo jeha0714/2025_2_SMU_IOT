@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Django + ChatGPT Demo</title>
+</head>
+<body>
+    <h2>ChatGPT Django 연동 테스트</h2>
+    <textarea id="prompt" rows="4" cols="50">안녕 ChatGPT!</textarea><br>
+    <button id="sendBtn">보내기</button>
+
+    <h3>응답:</h3>
+    <div id="result" style="border:1px solid #aaa; padding:10px; width:400px; min-height:80px;"></div>
+
+    <script>
+    document.getElementById('sendBtn').addEventListener('click', async () => {
+        const prompt = document.getElementById('prompt').value;
+        const result = document.getElementById('result');
+        result.innerText = '요청 중...';
+
+        try {
+            const res = await fetch('/api/chat/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({prompt})
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                result.innerText = data.response;
+
+                // 🔊 ChatGPT 응답을 음성으로 읽기
+                speakText(data.response);
+
+            } else {
+                result.innerText = '에러: ' + (data.error || JSON.stringify(data));
+            }
+        } catch (err) {
+            result.innerText = '요청 실패: ' + err.toString();
+        }
+    });
+
+    // 🎤 텍스트 음성 출력 함수
+    function speakText(text) {
+        // 기존에 말하고 있던 것 중단
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ko-KR';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        window.speechSynthesis.speak(utterance);
+    }
+</script>
+
+</body>
+</html>

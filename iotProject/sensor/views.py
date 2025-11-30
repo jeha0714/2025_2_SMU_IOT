@@ -25,7 +25,8 @@ OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
 VOICE_SYSTEM_PROMPT = (
     "당신은 스마트 창문과 블라인드를 제어하는 친절한 가정용 비서입니다. "
-    "반드시 2문장 이내의 간결한 한국어로 답변하고, 위험 상황에서는 주의 메시지를 우선 전달하세요."
+    "반드시 2문장 이내의 간결한 한국어로 답변하고, 위험 상황에서는 주의 메시지를 우선 전달하세요. "
+    "항상 다음 JSON 형식만 반환하세요: {\"reply\": \"한국어 답변\", \"actions\": [{\"device\": \"WINDOW|BLIND\", \"command\": \"OPEN|CLOSE|UP|DOWN\"}]}"
 )
 
 def index(request):
@@ -180,6 +181,23 @@ def _extract_voice_message(request):
     return message
 
 
+def _parse_voice_payload(raw_text):
+    if not raw_text:
+        return None
+    try:
+        return json.loads(raw_text)
+    except json.JSONDecodeError:
+        start = raw_text.find('{')
+        end = raw_text.rfind('}')
+        if start == -1 or end == -1 or end <= start:
+            return None
+        candidate = raw_text[start : end + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            return None
+
+
 @csrf_exempt
 @require_POST
 def voiceAssistant(request):
@@ -192,15 +210,68 @@ def voiceAssistant(request):
     try:
         response = openai_client.responses.create(
             model="gpt-4o-mini",
-            input=f"{VOICE_SYSTEM_PROMPT}\n사용자 요청: {message}",
+            input=[
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": VOICE_SYSTEM_PROMPT,
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": message,
+                        }
+                    ],
+                },
+            ],
         )
-        reply_text = getattr(response, "output_text", None)
-        if not reply_text:
-            reply_text = str(response)
+
+        raw_response = getattr(response, "output_text", None)
+        if not raw_response:
+            # responses.create 가 chunk 를 반환할 때 대비
+            chunks = []
+            for output in getattr(response, "output", []) or []:
+                for content in getattr(output, "content", []) or []:
+                    text_value = getattr(content, "text", None)
+                    if text_value:
+                        chunks.append(text_value)
+            raw_response = "".join(chunks)
+
+        parsed = _parse_voice_payload(raw_response)
+        if not parsed:
+            parsed = {"reply": raw_response or "응답을 해석할 수 없었습니다.", "actions": []}
+
+        reply_text = (parsed.get("reply") or "").strip()
+        actions = parsed.get("actions") if isinstance(parsed.get("actions"), list) else []
+
+        queued_actions = []
+        for action in actions:
+            if not isinstance(action, dict):
+                continue
+            device = str(action.get("device", "")).upper()
+            command = str(action.get("command", "")).upper()
+
+            normalized = None
+            if device == "WINDOW" and command in {"OPEN", "CLOSE"}:
+                normalized = command
+            elif device == "BLIND" and command in {"UP", "DOWN"}:
+                normalized = command
+
+            if normalized and normalized in ALLOWED_COMMANDS:
+                WinCmd.objects.create(command=normalized)
+                queued_actions.append({"device": device, "command": normalized})
+
         return JsonResponse(
             {
-                "reply": reply_text.strip(),
+                "reply": reply_text or "요청을 처리했습니다.",
                 "received": message,
+                "actionsQueued": queued_actions,
             }
         )
     except Exception as exc:

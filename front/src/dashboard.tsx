@@ -139,6 +139,7 @@ const SmartWindowDashboard = () => {
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceReply, setVoiceReply] = useState("");
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceActions, setVoiceActions] = useState<string[]>([]);
   const recognitionRef = useRef<RecognitionLike | null>(null);
 
   // 시간 단위 집계 (평균) 계산
@@ -363,9 +364,22 @@ const SmartWindowDashboard = () => {
     window.speechSynthesis.speak(utterance);
   };
 
+  const describeVoiceAction = (device: string, command: string) => {
+    const normalizedDevice = device.toUpperCase();
+    const normalizedCommand = command.toUpperCase();
+    if (normalizedDevice === "WINDOW") {
+      return normalizedCommand === "OPEN" ? "창문 열기" : "창문 닫기";
+    }
+    if (normalizedDevice === "BLIND") {
+      return normalizedCommand === "UP" ? "블라인드 올리기" : "블라인드 내리기";
+    }
+    return null;
+  };
+
   const sendVoiceQuery = async (message: string) => {
     setVoiceStatus("thinking");
     setVoiceError(null);
+    setVoiceActions([]);
     try {
       const response = await axios.post(`${API_BASE}/voiceAssistant`, {
         message,
@@ -375,6 +389,40 @@ const SmartWindowDashboard = () => {
         response.data?.response ??
         "응답을 받을 수 없었습니다.";
       setVoiceReply(replyText);
+
+      const queuedActions = Array.isArray(response.data?.actionsQueued)
+        ? (response.data.actionsQueued as {
+            device?: string;
+            command?: string;
+          }[])
+        : [];
+
+      const formattedActions = queuedActions.reduce<string[]>((acc, action) => {
+        if (!action?.device || !action?.command) {
+          return acc;
+        }
+        const label = describeVoiceAction(action.device, action.command);
+        if (label) {
+          acc.push(label);
+        }
+        return acc;
+      }, []);
+
+      if (formattedActions.length > 0) {
+        setVoiceActions(formattedActions);
+      }
+
+      queuedActions.forEach((action) => {
+        const device = action?.device?.toUpperCase();
+        const command = action?.command?.toUpperCase();
+        if (device === "WINDOW" && command) {
+          setWindowOpen(command === "OPEN");
+        }
+        if (device === "BLIND" && command) {
+          setBlindOpen(command === "UP");
+        }
+      });
+
       setVoiceStatus("speaking");
       speakResponse(replyText);
     } catch (err) {
@@ -411,6 +459,7 @@ const SmartWindowDashboard = () => {
         return;
       }
       setVoiceTranscript(transcript);
+      setVoiceActions([]);
       recognition.stop();
       sendVoiceQuery(transcript);
     };
@@ -883,6 +932,11 @@ const SmartWindowDashboard = () => {
               {voiceReply && (
                 <p className="mt-2 text-sm text-gray-800">
                   응답: <span className="font-semibold">{voiceReply}</span>
+                </p>
+              )}
+              {voiceActions.length > 0 && (
+                <p className="mt-1 text-xs text-blue-600">
+                  실행 명령: {voiceActions.join(", ")}
                 </p>
               )}
             </div>

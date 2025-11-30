@@ -51,7 +51,8 @@ const pseudoRandom = (seed: number) => {
   return x - Math.floor(x);
 };
 
-const API_BASE = "http://127.0.0.1:8000/sensor";
+// const API_BASE = "http://127.0.0.1:8000/sensor";
+const API_BASE = `http://172.17.100.187:8000/sensor`;
 
 const SmartWindowDashboard = () => {
   const [windowOpen, setWindowOpen] = useState<boolean | null>(null);
@@ -244,7 +245,7 @@ const SmartWindowDashboard = () => {
 
     // 최초 1회 즉시 실행 후 주기적 폴링
     fetchAll();
-    const interval = setInterval(fetchAll, 3000); // 1초 주기
+    const interval = setInterval(fetchAll, 1000); // 1초 주기
     return () => clearInterval(interval);
   }, []);
 
@@ -292,6 +293,132 @@ const SmartWindowDashboard = () => {
   const isWindowOpen = windowOpen === true;
   const isBlindOpen = blindOpen === true;
 
+  const renderWeatherBackdrop = (
+    options: {
+      includeEnvironmentEffects?: boolean;
+      extraClassName?: string;
+    } = {}
+  ) => {
+    const { includeEnvironmentEffects = true, extraClassName = "" } = options;
+
+    const baseBackgroundClass =
+      weatherType === "sunny"
+        ? "bg-gradient-to-b from-sky-400 to-sky-200"
+        : weatherType === "cloudy"
+        ? "bg-gradient-to-b from-gray-400 to-gray-300"
+        : "bg-gradient-to-b from-gray-600 to-gray-500";
+
+    return (
+      <div
+        className={`absolute inset-0 transition-all duration-1000 ${baseBackgroundClass} ${extraClassName}`}
+      >
+        {weatherType === "sunny" && (
+          <>
+            <div className="absolute top-8 left-12 w-20 h-10 bg-white rounded-full opacity-70"></div>
+            <div className="absolute top-12 right-16 w-24 h-12 bg-white rounded-full opacity-60"></div>
+            <div className="absolute top-20 left-24 w-16 h-8 bg-white rounded-full opacity-50"></div>
+            <div className="absolute top-6 right-6 w-16 h-16 bg-yellow-300 rounded-full shadow-lg">
+              <div className="absolute inset-0 animate-pulse bg-yellow-200 rounded-full opacity-50"></div>
+            </div>
+          </>
+        )}
+
+        {weatherType === "cloudy" && (
+          <>
+            <div className="absolute top-4 left-8 w-28 h-16 bg-gray-100 rounded-full opacity-90 shadow-md"></div>
+            <div className="absolute top-12 right-12 w-32 h-18 bg-gray-100 rounded-full opacity-85 shadow-md"></div>
+            <div className="absolute top-20 left-16 w-24 h-14 bg-gray-200 rounded-full opacity-80 shadow-md"></div>
+            <div className="absolute bottom-16 right-8 w-28 h-16 bg-gray-100 rounded-full opacity-90 shadow-md"></div>
+            <div className="absolute bottom-8 left-20 w-20 h-12 bg-gray-200 rounded-full opacity-75 shadow-md"></div>
+          </>
+        )}
+
+        {weatherType === "rainy" && (
+          <>
+            <div className="absolute top-4 left-8 w-32 h-18 bg-gray-700 rounded-full opacity-80 shadow-lg"></div>
+            <div className="absolute top-12 right-10 w-36 h-20 bg-gray-700 rounded-full opacity-85 shadow-lg"></div>
+            <div className="absolute top-8 left-24 w-28 h-16 bg-gray-800 rounded-full opacity-75 shadow-lg"></div>
+
+            {rainDrops.map((drop) => (
+              <div
+                key={`rain-${drop.id}`}
+                className="absolute w-0.5 bg-blue-200 opacity-60 animate-rainfall"
+                style={{
+                  left: `${drop.left}%`,
+                  top: `${drop.top}px`,
+                  height: `${drop.height}px`,
+                  animationDelay: `${drop.delay}s`,
+                  animationDuration: `${drop.duration}s`,
+                }}
+              ></div>
+            ))}
+          </>
+        )}
+
+        {includeEnvironmentEffects && environmentEffects.highDust && (
+          <div className="absolute inset-0 bg-yellow-900 opacity-30 mix-blend-multiply">
+            {dustParticles.map((p, i) => (
+              <div
+                key={`dust-${i}`}
+                className="absolute w-1 h-1 bg-yellow-600 rounded-full opacity-40 animate-float"
+                style={{
+                  left: `${p.left}%`,
+                  top: `${p.top}%`,
+                  animationDuration: `${p.duration}s`,
+                  animationDelay: `${p.delay}s`,
+                }}
+              ></div>
+            ))}
+          </div>
+        )}
+
+        {includeEnvironmentEffects && environmentEffects.highTemp && (
+          <div className="absolute inset-0">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={`heat-${i}`}
+                className="absolute bottom-0 w-full h-24 bg-gradient-to-t from-red-400 to-transparent opacity-20 animate-heatwave"
+                style={{
+                  animationDuration: `${2 + i * 0.5}s`,
+                  animationDelay: `${i * 0.3}s`,
+                }}
+              ></div>
+            ))}
+          </div>
+        )}
+
+        {includeEnvironmentEffects && environmentEffects.highHumidity && (
+          <div className="absolute inset-0 bg-blue-200 opacity-20">
+            {humidityParticles.map((p, i) => (
+              <div
+                key={`humidity-${i}`}
+                className="absolute w-2 h-2 bg-blue-400 rounded-full opacity-40 animate-drip"
+                style={{
+                  left: `${p.left}%`,
+                  top: `${p.top}%`,
+                  animationDuration: `${p.duration}s`,
+                  animationDelay: `${p.delay}s`,
+                }}
+              ></div>
+            ))}
+          </div>
+        )}
+
+        {includeEnvironmentEffects && environmentEffects.strongLight && (
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-yellow-100 opacity-40 animate-pulse"></div>
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={`light-${i}`}
+                className={`absolute top-1/2 left-1/2 w-2 h-32 bg-yellow-200 opacity-30 animate-spin light-ray-${i} light-ray-rotate`}
+              ></div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -338,129 +465,7 @@ const SmartWindowDashboard = () => {
             <div className="flex justify-center">
               <div className="relative w-96 h-72 bg-gray-800 rounded-lg overflow-hidden border-8 border-gray-700 shadow-2xl">
                 {/* 창문 프레임 배경 (날씨별 배경) */}
-                <div
-                  className={`absolute inset-0 transition-all duration-1000 ${
-                    weatherType === "sunny"
-                      ? "bg-gradient-to-b from-sky-400 to-sky-200"
-                      : weatherType === "cloudy"
-                      ? "bg-gradient-to-b from-gray-400 to-gray-300"
-                      : "bg-gradient-to-b from-gray-600 to-gray-500"
-                  }`}
-                >
-                  {/* 맑은 날 - 구름과 태양 */}
-                  {weatherType === "sunny" && (
-                    <>
-                      <div className="absolute top-8 left-12 w-20 h-10 bg-white rounded-full opacity-70"></div>
-                      <div className="absolute top-12 right-16 w-24 h-12 bg-white rounded-full opacity-60"></div>
-                      <div className="absolute top-20 left-24 w-16 h-8 bg-white rounded-full opacity-50"></div>
-                      {/* 태양 */}
-                      <div className="absolute top-6 right-6 w-16 h-16 bg-yellow-300 rounded-full shadow-lg">
-                        <div className="absolute inset-0 animate-pulse bg-yellow-200 rounded-full opacity-50"></div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* 구름 많은 날 */}
-                  {weatherType === "cloudy" && (
-                    <>
-                      <div className="absolute top-4 left-8 w-28 h-16 bg-gray-100 rounded-full opacity-90 shadow-md"></div>
-                      <div className="absolute top-12 right-12 w-32 h-18 bg-gray-100 rounded-full opacity-85 shadow-md"></div>
-                      <div className="absolute top-20 left-16 w-24 h-14 bg-gray-200 rounded-full opacity-80 shadow-md"></div>
-                      <div className="absolute bottom-16 right-8 w-28 h-16 bg-gray-100 rounded-full opacity-90 shadow-md"></div>
-                      <div className="absolute bottom-8 left-20 w-20 h-12 bg-gray-200 rounded-full opacity-75 shadow-md"></div>
-                    </>
-                  )}
-
-                  {/* 비오는 날 */}
-                  {weatherType === "rainy" && (
-                    <>
-                      {/* 어두운 구름 */}
-                      <div className="absolute top-4 left-8 w-32 h-18 bg-gray-700 rounded-full opacity-80 shadow-lg"></div>
-                      <div className="absolute top-12 right-10 w-36 h-20 bg-gray-700 rounded-full opacity-85 shadow-lg"></div>
-                      <div className="absolute top-8 left-24 w-28 h-16 bg-gray-800 rounded-full opacity-75 shadow-lg"></div>
-
-                      {/* 빗줄기 */}
-                      {rainDrops.map((drop) => (
-                        <div
-                          key={drop.id}
-                          className="absolute w-0.5 bg-blue-200 opacity-60 animate-rainfall"
-                          style={{
-                            left: `${drop.left}%`,
-                            top: `${drop.top}px`,
-                            height: `${drop.height}px`,
-                            animationDelay: `${drop.delay}s`,
-                            animationDuration: `${drop.duration}s`,
-                          }}
-                        ></div>
-                      ))}
-                    </>
-                  )}
-
-                  {/* 미세먼지 효과 */}
-                  {environmentEffects.highDust && (
-                    <div className="absolute inset-0 bg-yellow-900 opacity-30 mix-blend-multiply">
-                      {dustParticles.map((p, i) => (
-                        <div
-                          key={i}
-                          className="absolute w-1 h-1 bg-yellow-600 rounded-full opacity-40 animate-float"
-                          style={{
-                            left: `${p.left}%`,
-                            top: `${p.top}%`,
-                            animationDuration: `${p.duration}s`,
-                            animationDelay: `${p.delay}s`,
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 고온 효과 */}
-                  {environmentEffects.highTemp && (
-                    <div className="absolute inset-0">
-                      {[...Array(5)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="absolute bottom-0 w-full h-24 bg-gradient-to-t from-red-400 to-transparent opacity-20 animate-heatwave"
-                          style={{
-                            animationDuration: `${2 + i * 0.5}s`,
-                            animationDelay: `${i * 0.3}s`,
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 고습도 효과 */}
-                  {environmentEffects.highHumidity && (
-                    <div className="absolute inset-0 bg-blue-200 opacity-20">
-                      {humidityParticles.map((p, i) => (
-                        <div
-                          key={i}
-                          className="absolute w-2 h-2 bg-blue-400 rounded-full opacity-40 animate-drip"
-                          style={{
-                            left: `${p.left}%`,
-                            top: `${p.top}%`,
-                            animationDuration: `${p.duration}s`,
-                            animationDelay: `${p.delay}s`,
-                          }}
-                        ></div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 강한 빛 효과 */}
-                  {environmentEffects.strongLight && (
-                    <div className="absolute inset-0">
-                      <div className="absolute inset-0 bg-yellow-100 opacity-40 animate-pulse"></div>
-                      {[...Array(8)].map((_, i) => (
-                        <div
-                          key={i}
-                          className={`absolute top-1/2 left-1/2 w-2 h-32 bg-yellow-200 opacity-30 animate-spin light-ray-${i} light-ray-rotate`}
-                        ></div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                {renderWeatherBackdrop()}
 
                 {/* 창문 프레임 (고정) */}
                 <div className="absolute inset-0 pointer-events-none z-20">
@@ -506,6 +511,7 @@ const SmartWindowDashboard = () => {
             <div className="flex justify-center">
               <div className="blind-scene">
                 <div className="blind-view">
+                  {renderWeatherBackdrop({ includeEnvironmentEffects: false })}
                   <div className="blind-cityline"></div>
                   <div
                     className={`blind-overlay ${

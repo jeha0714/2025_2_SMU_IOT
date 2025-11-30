@@ -26,8 +26,8 @@ SECRET_KEY = 'django-insecure-8c97@1&hkaflv*b8pf&mai#h9^h!ky!5b%p7qce01g6_-(7-sh
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+# ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "172.17.100.187"]  # 맥의 로컬 IP 추가
 
 # Application definition
 

@@ -36,10 +36,10 @@ while(1):
         print("Invaild Value")
 
 
-NORMAL_INTERVAL = 3  # 정상 데이터 수신 시 60초 후 재시도
-ERROR_INTERVAL = 1    # 에러/OnRxError 발생 시 1초 후 재시도
+NORMAL_INTERVAL = 0.5  # 정상 데이터 수신 시 60초 후 재시도
+ERROR_INTERVAL = 0.5    # 에러/OnRxError 발생 시 1초 후 재시도
 
-next_sleep = 5  # 최초 대기 (기존 로직 유지)
+next_sleep = 0.5  # 최초 대기 (기존 로직 유지)
 
 while True:
     time.sleep(next_sleep)

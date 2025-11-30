@@ -1,3 +1,4 @@
+import os
 from django.http import HttpResponse
 from .models import (
     TemperatureSensor as Temp,
@@ -14,8 +15,18 @@ from .models import (
 from django.shortcuts import render
 from django.core import serializers
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+from openai import OpenAI
 import random
 import json
+
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
+VOICE_SYSTEM_PROMPT = (
+    "당신은 스마트 창문과 블라인드를 제어하는 친절한 가정용 비서입니다. "
+    "반드시 2문장 이내의 간결한 한국어로 답변하고, 위험 상황에서는 주의 메시지를 우선 전달하세요."
+)
 
 def index(request):
     sensor_value_list = Temp.objects.all().order_by('-reg_date').values()[:5]
@@ -155,5 +166,47 @@ def getNextCommand(request):
         cmd.save(update_fields=['processed'])
         return JsonResponse({"command": cmd.command})
     return JsonResponse({"command": "ACK"})
+
+
+def _extract_voice_message(request):
+    message = request.POST.get('message') or request.POST.get('text')
+    if (not message) and request.body:
+        try:
+            payload = json.loads(request.body.decode('utf-8'))
+            if isinstance(payload, dict):
+                message = payload.get('message') or payload.get('text')
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            message = None
+    return message
+
+
+@csrf_exempt
+@require_POST
+def voiceAssistant(request):
+    message = _extract_voice_message(request)
+    if not message:
+        return JsonResponse({"message": "MESSAGE_REQUIRED"}, status=400)
+    if not openai_client:
+        return JsonResponse({"message": "OPENAI_KEY_MISSING"}, status=500)
+
+    try:
+        response = openai_client.responses.create(
+            model="gpt-4o-mini",
+            input=f"{VOICE_SYSTEM_PROMPT}\n사용자 요청: {message}",
+        )
+        reply_text = getattr(response, "output_text", None)
+        if not reply_text:
+            reply_text = str(response)
+        return JsonResponse(
+            {
+                "reply": reply_text.strip(),
+                "received": message,
+            }
+        )
+    except Exception as exc:
+        return JsonResponse(
+            {"message": "OPENAI_REQUEST_FAILED", "detail": str(exc)},
+            status=500,
+        )
 
 # Create your views here.

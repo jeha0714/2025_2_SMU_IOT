@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import {
   Wind,
@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ThermometerSun,
   Activity,
+  Mic,
 } from "lucide-react";
 import {
   LineChart,
@@ -45,6 +46,43 @@ type SensorData = {
 
 type EffectKey = "highDust" | "highTemp" | "highHumidity" | "strongLight";
 type EnvironmentEffects = Record<EffectKey, boolean>;
+type VoiceStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
+type RecognitionResultAlternative = {
+  transcript: string;
+};
+
+type RecognitionResultList = {
+  [index: number]: RecognitionResultAlternative;
+  length: number;
+  item?: (index: number) => RecognitionResultAlternative;
+};
+
+type RecognitionResultEvent = {
+  results: {
+    [index: number]: RecognitionResultList;
+    length: number;
+    item?: (index: number) => RecognitionResultList;
+  };
+};
+
+type RecognitionErrorEvent = {
+  error?: string;
+  message?: string;
+};
+
+type RecognitionLike = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort?: () => void;
+  onresult: ((event: RecognitionResultEvent) => void) | null;
+  onerror: ((event: RecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+};
+
+type SpeechRecognitionConstructor = new () => RecognitionLike;
 
 const pseudoRandom = (seed: number) => {
   const x = Math.sin(seed) * 10000;
@@ -97,6 +135,11 @@ const SmartWindowDashboard = () => {
     { time: "12:05", dust: 35, temp: 22, humidity: 55 },
   ]);
   const [rangeMode, setRangeMode] = useState<"minute" | "hour">("minute");
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [voiceReply, setVoiceReply] = useState("");
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const recognitionRef = useRef<RecognitionLike | null>(null);
 
   // 시간 단위 집계 (평균) 계산
   const hourlyHistory: HourPoint[] = useMemo(() => {
@@ -249,6 +292,16 @@ const SmartWindowDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort?.();
+      recognitionRef.current = null;
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const toggleEnvironmentEffect = (effect: EffectKey) => {
     setEnvironmentEffects((prev) => ({
       ...prev,
@@ -274,6 +327,117 @@ const SmartWindowDashboard = () => {
     }
   };
 
+  const getSpeechRecognitionConstructor =
+    (): SpeechRecognitionConstructor | null => {
+      if (typeof window === "undefined") {
+        return null;
+      }
+      const globalWindow = window as Window &
+        typeof globalThis & {
+          webkitSpeechRecognition?: SpeechRecognitionConstructor;
+          SpeechRecognition?: SpeechRecognitionConstructor;
+        };
+      return (
+        globalWindow.SpeechRecognition ||
+        globalWindow.webkitSpeechRecognition ||
+        null
+      );
+    };
+
+  const speakResponse = (message: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      setVoiceError("이 브라우저는 음성 출력을 지원하지 않습니다.");
+      setVoiceStatus("error");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = "ko-KR";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.onend = () => setVoiceStatus("idle");
+    utterance.onerror = () => {
+      setVoiceError("응답을 재생하는 중 문제가 발생했습니다.");
+      setVoiceStatus("error");
+    };
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const sendVoiceQuery = async (message: string) => {
+    setVoiceStatus("thinking");
+    setVoiceError(null);
+    try {
+      const response = await axios.post(`${API_BASE}/voiceAssistant`, {
+        message,
+      });
+      const replyText =
+        response.data?.reply ??
+        response.data?.response ??
+        "응답을 받을 수 없었습니다.";
+      setVoiceReply(replyText);
+      setVoiceStatus("speaking");
+      speakResponse(replyText);
+    } catch (err) {
+      console.error("음성 비서 통신 실패", err);
+      setVoiceError("서버와 통신하는 중 오류가 발생했습니다.");
+      setVoiceStatus("error");
+    }
+  };
+
+  const handleMicButtonClick = () => {
+    const Recognition = getSpeechRecognitionConstructor();
+    if (voiceStatus === "listening" && recognitionRef.current) {
+      recognitionRef.current.stop();
+      return;
+    }
+    if (!Recognition) {
+      setVoiceError("이 브라우저에서는 음성 인식을 사용할 수 없습니다.");
+      setVoiceStatus("error");
+      return;
+    }
+    const recognition = new Recognition();
+    recognition.lang = "ko-KR";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: RecognitionResultEvent) => {
+      const transcript =
+        event.results?.[0]?.[0]?.transcript ??
+        event.results?.item?.(0)?.item?.(0)?.transcript ??
+        "";
+      if (!transcript) {
+        setVoiceError("음성을 인식하지 못했습니다. 다시 시도해주세요.");
+        setVoiceStatus("error");
+        return;
+      }
+      setVoiceTranscript(transcript);
+      recognition.stop();
+      sendVoiceQuery(transcript);
+    };
+
+    recognition.onerror = (event: RecognitionErrorEvent) => {
+      const errMsg =
+        event.error === "not-allowed"
+          ? "마이크 사용 권한을 허용해주세요."
+          : "음성 인식 중 문제가 발생했습니다.";
+      setVoiceError(errMsg);
+      setVoiceStatus("error");
+    };
+
+    recognition.onend = () => {
+      recognitionRef.current = null;
+      setVoiceStatus((prev) => (prev === "listening" ? "idle" : prev));
+    };
+
+    recognitionRef.current = recognition;
+    setVoiceTranscript("");
+    setVoiceStatus("listening");
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    recognition.start();
+  };
+
   const getDustLevel = (value: number) => {
     if (value <= 30)
       return { level: "좋음", color: "text-green-500", bg: "bg-green-50" };
@@ -287,6 +451,18 @@ const SmartWindowDashboard = () => {
     if (level === "중") return "text-orange-400";
     return "text-gray-400";
   };
+
+  const voiceStatusLabel: Record<VoiceStatus, string> = {
+    idle: "음성 도우미",
+    listening: "듣는 중...",
+    thinking: "응답 생성 중",
+    speaking: "읽어주는 중",
+    error: "다시 시도",
+  };
+
+  const isVoiceActive = ["listening", "thinking", "speaking"].includes(
+    voiceStatus
+  );
 
   const dustInfo = getDustLevel(sensorData.dust);
   const hasWarning = sensorData.dust > 50 || sensorData.rain;
@@ -676,9 +852,40 @@ const SmartWindowDashboard = () => {
                   ? "블라인드 내리기"
                   : "블라인드 올리기"}
               </button>
+              <button
+                type="button"
+                onClick={handleMicButtonClick}
+                className={`px-8 py-4 rounded-xl font-semibold text-lg transition-all transform flex items-center justify-center gap-2 ${
+                  voiceStatus === "error"
+                    ? "bg-red-100 text-red-600 hover:bg-red-200"
+                    : isVoiceActive
+                    ? "bg-rose-500 text-white hover:bg-rose-600"
+                    : "bg-white border border-gray-300 text-gray-800 hover:bg-gray-50"
+                }`}
+              >
+                <Mic size={20} />
+                <span>{voiceStatusLabel[voiceStatus]}</span>
+              </button>
             </div>
           </div>
           <div className="mt-4">
+            <div className="mb-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  마지막 음성 명령: {voiceTranscript || "-"}
+                </p>
+                {voiceError && (
+                  <span className="text-xs text-red-600 font-medium">
+                    {voiceError}
+                  </span>
+                )}
+              </div>
+              {voiceReply && (
+                <p className="mt-2 text-sm text-gray-800">
+                  응답: <span className="font-semibold">{voiceReply}</span>
+                </p>
+              )}
+            </div>
             <div className="flex flex-wrap gap-3">
               <div
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${

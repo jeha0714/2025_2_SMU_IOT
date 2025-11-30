@@ -27,4 +27,5 @@ urlpatterns = [
     path('setDir', views.setDir, name='setDir'),
     path('setWDir', views.setWDir, name='setWDir'),
     path('setBDir', views.setBDir, name='setBDir'),
+    path('voiceAssistant', views.voiceAssistant, name='voiceAssistant'),
 ]

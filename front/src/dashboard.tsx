@@ -218,6 +218,8 @@ const SmartWindowDashboard = () => {
           timestamp: new Date().toLocaleTimeString("ko-KR"),
         };
         setSensorData(newData);
+        const derivedWeather = newData.rain ? "rainy" : "sunny";
+        setWeatherType((prev) => (prev === derivedWeather ? prev : derivedWeather));
 
         setMinuteHistory((prev) => {
           const newHistory = [
@@ -643,48 +645,6 @@ const SmartWindowDashboard = () => {
                 <div className="blind-status-chip">
                   {isBlindOpen ? "Blind Open" : "Blind Closed"}
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 날씨 및 환경 효과 컨트롤 */}
-          <div className="mb-6 bg-gray-50 rounded-xl p-6 border-2 border-gray-200">
-            {/* 날씨 선택 (단일 선택) */}
-            <div className="mb-5">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                날씨 선택
-              </h3>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setWeatherType("sunny")}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                    weatherType === "sunny"
-                      ? "bg-yellow-400 text-black shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  ☀️ 맑은 날
-                </button>
-                <button
-                  onClick={() => setWeatherType("cloudy")}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                    weatherType === "cloudy"
-                      ? "bg-gray-400 text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  ☁️ 구름 많음
-                </button>
-                <button
-                  onClick={() => setWeatherType("rainy")}
-                  className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
-                    weatherType === "rainy"
-                      ? "bg-blue-500 text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  🌧️ 비오는 날
-                </button>
               </div>
             </div>
           </div>

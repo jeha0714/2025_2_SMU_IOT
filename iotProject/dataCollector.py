@@ -36,10 +36,10 @@ while(1):
         print("Invaild Value")
 
 
-NORMAL_INTERVAL = 0.5  # 정상 데이터 수신 시 60초 후 재시도
-ERROR_INTERVAL = 0.5    # 에러/OnRxError 발생 시 1초 후 재시도
+NORMAL_INTERVAL = 1  # 정상 데이터 수신 시 60초 후 재시도
+ERROR_INTERVAL = 1    # 에러/OnRxError 발생 시 1초 후 재시도
 
-next_sleep = 0.5  # 최초 대기 (기존 로직 유지)
+next_sleep = 1  # 최초 대기 (기존 로직 유지)
 
 while True:
     time.sleep(next_sleep)
@@ -123,11 +123,11 @@ while True:
                 data = {'value': value}
                 try:
                     response = requests.post(f"http://localhost:8000/sensor/{api_endpoint}", data=data, timeout=5)
-                    if response.status_code != 200:
-                        print(f"❌ [{sensor_name}] HTTP {response.status_code} -> fast retry")
-                        next_sleep = ERROR_INTERVAL
-                    else:
-                        print(f"✅ [{sensor_name}] {value} -> {response.json()}")
+                    # if response.status_code != 200:
+                    #     print(f"❌ [{sensor_name}] HTTP {response.status_code} -> fast retry")
+                    #     next_sleep = ERROR_INTERVAL
+                    # else:
+                        # print(f"✅ [{sensor_name}] {value} -> {response.json()}")
                 except Exception as e:
                     print(f"❌ [{sensor_name}] Server error: {e} -> fast retry")
                     next_sleep = ERROR_INTERVAL

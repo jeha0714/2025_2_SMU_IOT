@@ -44,8 +44,6 @@ type SensorData = {
   timestamp: string;
 };
 
-type EffectKey = "highDust" | "highTemp" | "highHumidity" | "strongLight";
-type EnvironmentEffects = Record<EffectKey, boolean>;
 type VoiceStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
 type RecognitionResultAlternative = {
   transcript: string;
@@ -96,13 +94,6 @@ const SmartWindowDashboard = () => {
   const [windowOpen, setWindowOpen] = useState<boolean | null>(null);
   const [blindOpen, setBlindOpen] = useState<boolean | null>(null);
   const [weatherType, setWeatherType] = useState("sunny"); // sunny, cloudy, rainy
-  const [environmentEffects, setEnvironmentEffects] =
-    useState<EnvironmentEffects>({
-      highDust: false,
-      highTemp: false,
-      highHumidity: false,
-      strongLight: false,
-    });
 
   const [sensorData, setSensorData] = useState<SensorData>({
     dust: 0,
@@ -182,43 +173,6 @@ const SmartWindowDashboard = () => {
     }));
   }, []);
 
-  // 파티클은 최초 한 번 생성 후 효과가 꺼지면 숨김만 처리
-  const dustParticles = useMemo(() => {
-    const particles = [] as {
-      left: number;
-      top: number;
-      duration: number;
-      delay: number;
-    }[];
-    for (let i = 0; i < 30; i++) {
-      const seed = i + 1;
-      const left = (((Math.sin(seed) * 10000) % 100) + 100) % 100;
-      const top = (((Math.sin(seed * 1.3) * 10000) % 100) + 100) % 100;
-      const duration = 2 + (((Math.sin(seed * 0.7) * 10000) % 100) / 100) * 2;
-      const delay = (((Math.sin(seed * 0.9) * 10000) % 100) / 100) * 2;
-      particles.push({ left, top, duration, delay });
-    }
-    return particles;
-  }, []);
-
-  const humidityParticles = useMemo(() => {
-    const particles = [] as {
-      left: number;
-      top: number;
-      duration: number;
-      delay: number;
-    }[];
-    for (let i = 0; i < 20; i++) {
-      const seed = i + 10;
-      const left = (((Math.sin(seed * 1.1) * 10000) % 100) + 100) % 100;
-      const top = (((Math.sin(seed * 1.5) * 10000) % 100) + 100) % 100;
-      const duration = 2 + (((Math.sin(seed * 0.4) * 10000) % 100) / 100) * 3;
-      const delay = (((Math.sin(seed * 0.8) * 10000) % 100) / 100) * 2;
-      particles.push({ left, top, duration, delay });
-    }
-    return particles;
-  }, []);
-
   // 백엔드에서 실시간 센서 데이터 폴링
   useEffect(() => {
     const fetchAll = async () => {
@@ -253,7 +207,7 @@ const SmartWindowDashboard = () => {
 
         // 조도 수치 → 등급 매핑 (임시 기준값)
         const lightLevel: "상" | "중" | "하" =
-          latestLightRaw > 70 ? "상" : latestLightRaw > 40 ? "중" : "하";
+          latestLightRaw > 4000 ? "상" : latestLightRaw > 2000 ? "중" : "하";
 
         const newData = {
           dust: latestDust,
@@ -289,7 +243,7 @@ const SmartWindowDashboard = () => {
 
     // 최초 1회 즉시 실행 후 주기적 폴링
     fetchAll();
-    const interval = setInterval(fetchAll, 1000); // 1초 주기
+    const interval = setInterval(fetchAll, 2000); // 1초 주기
     return () => clearInterval(interval);
   }, []);
 
@@ -302,13 +256,6 @@ const SmartWindowDashboard = () => {
       }
     };
   }, []);
-
-  const toggleEnvironmentEffect = (effect: EffectKey) => {
-    setEnvironmentEffects((prev) => ({
-      ...prev,
-      [effect]: !prev[effect],
-    }));
-  };
 
   const sendWindowCommand = async (desiredOpen: boolean) => {
     const command = desiredOpen ? "OPEN" : "CLOSE";
@@ -412,16 +359,16 @@ const SmartWindowDashboard = () => {
         setVoiceActions(formattedActions);
       }
 
-      queuedActions.forEach((action) => {
-        const device = action?.device?.toUpperCase();
-        const command = action?.command?.toUpperCase();
-        if (device === "WINDOW" && command) {
-          setWindowOpen(command === "OPEN");
-        }
-        if (device === "BLIND" && command) {
-          setBlindOpen(command === "UP");
-        }
-      });
+      // queuedActions.forEach((action) => {
+      //   const device = action?.device?.toUpperCase();
+      //   const command = action?.command?.toUpperCase();
+      //   if (device === "WINDOW" && command) {
+      //     setWindowOpen(command === "OPEN");
+      //   }
+      //   if (device === "BLIND" && command) {
+      //     setBlindOpen(command === "UP");
+      //   }
+      // });
 
       setVoiceStatus("speaking");
       speakResponse(replyText);
@@ -524,7 +471,7 @@ const SmartWindowDashboard = () => {
       extraClassName?: string;
     } = {}
   ) => {
-    const { includeEnvironmentEffects = true, extraClassName = "" } = options;
+    const { extraClassName = "" } = options;
 
     const baseBackgroundClass =
       weatherType === "sunny"
@@ -578,67 +525,6 @@ const SmartWindowDashboard = () => {
               ></div>
             ))}
           </>
-        )}
-
-        {includeEnvironmentEffects && environmentEffects.highDust && (
-          <div className="absolute inset-0 bg-yellow-900 opacity-30 mix-blend-multiply">
-            {dustParticles.map((p, i) => (
-              <div
-                key={`dust-${i}`}
-                className="absolute w-1 h-1 bg-yellow-600 rounded-full opacity-40 animate-float"
-                style={{
-                  left: `${p.left}%`,
-                  top: `${p.top}%`,
-                  animationDuration: `${p.duration}s`,
-                  animationDelay: `${p.delay}s`,
-                }}
-              ></div>
-            ))}
-          </div>
-        )}
-
-        {includeEnvironmentEffects && environmentEffects.highTemp && (
-          <div className="absolute inset-0">
-            {[...Array(5)].map((_, i) => (
-              <div
-                key={`heat-${i}`}
-                className="absolute bottom-0 w-full h-24 bg-gradient-to-t from-red-400 to-transparent opacity-20 animate-heatwave"
-                style={{
-                  animationDuration: `${2 + i * 0.5}s`,
-                  animationDelay: `${i * 0.3}s`,
-                }}
-              ></div>
-            ))}
-          </div>
-        )}
-
-        {includeEnvironmentEffects && environmentEffects.highHumidity && (
-          <div className="absolute inset-0 bg-blue-200 opacity-20">
-            {humidityParticles.map((p, i) => (
-              <div
-                key={`humidity-${i}`}
-                className="absolute w-2 h-2 bg-blue-400 rounded-full opacity-40 animate-drip"
-                style={{
-                  left: `${p.left}%`,
-                  top: `${p.top}%`,
-                  animationDuration: `${p.duration}s`,
-                  animationDelay: `${p.delay}s`,
-                }}
-              ></div>
-            ))}
-          </div>
-        )}
-
-        {includeEnvironmentEffects && environmentEffects.strongLight && (
-          <div className="absolute inset-0">
-            <div className="absolute inset-0 bg-yellow-100 opacity-40 animate-pulse"></div>
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={`light-${i}`}
-                className={`absolute top-1/2 left-1/2 w-2 h-32 bg-yellow-200 opacity-30 animate-spin light-ray-${i} light-ray-rotate`}
-              ></div>
-            ))}
-          </div>
         )}
       </div>
     );
@@ -801,55 +687,6 @@ const SmartWindowDashboard = () => {
                 </button>
               </div>
             </div>
-
-            {/* 환경 효과 선택 (다중 선택) */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                환경 효과 (다중 선택 가능)
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <button
-                  onClick={() => toggleEnvironmentEffect("highDust")}
-                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
-                    environmentEffects.highDust
-                      ? "bg-yellow-600 text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  💨 미세먼지
-                </button>
-                <button
-                  onClick={() => toggleEnvironmentEffect("highTemp")}
-                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
-                    environmentEffects.highTemp
-                      ? "bg-red-500 text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  🌡️ 고온
-                </button>
-                <button
-                  onClick={() => toggleEnvironmentEffect("highHumidity")}
-                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
-                    environmentEffects.highHumidity
-                      ? "bg-blue-600 text-white shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  💧 고습도
-                </button>
-                <button
-                  onClick={() => toggleEnvironmentEffect("strongLight")}
-                  className={`px-4 py-3 rounded-lg font-medium transition-all ${
-                    environmentEffects.strongLight
-                      ? "bg-yellow-300 text-gray-800 shadow-md"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  ☀️ 강한 빛
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* 제어 버튼 */}
@@ -997,7 +834,7 @@ const SmartWindowDashboard = () => {
             <div className="text-3xl font-bold text-gray-900 mb-1">
               {sensorData.dust}
             </div>
-            <div className="text-sm text-gray-600">㍍/m³</div>
+            <div className="text-sm text-gray-600">µg/m³</div>
           </div>
 
           {/* 온도 */}

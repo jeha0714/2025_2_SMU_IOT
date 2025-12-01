@@ -117,14 +117,50 @@ const SmartWindowDashboard = () => {
     humidity: number;
   };
 
-  const [minuteHistory, setMinuteHistory] = useState<MinutePoint[]>([
-    { time: "10:00", dust: 25, temp: 20, humidity: 50 },
-    { time: "10:01", dust: 26, temp: 20, humidity: 50 },
-    { time: "10:02", dust: 27, temp: 20, humidity: 51 },
-    { time: "10:40", dust: 35, temp: 23, humidity: 55 },
-    { time: "11:10", dust: 40, temp: 24, humidity: 53 },
-    { time: "12:05", dust: 35, temp: 22, humidity: 55 },
-  ]);
+  const formatMinuteLabel = (date: Date) =>
+    date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+
+  const formatHourLabel = (date: Date) =>
+    `${date.getHours().toString().padStart(2, "0")}시`;
+
+  const buildMinuteDummyHistory = (): MinutePoint[] => {
+    const template: Omit<MinutePoint, "time">[] = [
+      { dust: 25, temp: 20, humidity: 50 },
+      { dust: 26, temp: 20, humidity: 50 },
+      { dust: 27, temp: 20, humidity: 51 },
+      { dust: 35, temp: 23, humidity: 55 },
+      { dust: 40, temp: 24, humidity: 53 },
+      { dust: 35, temp: 22, humidity: 55 },
+    ];
+    const now = Date.now();
+    return template.map((point, idx, arr) => {
+      const offsetMs = (arr.length - 1 - idx) * 60 * 1000;
+      const target = new Date(now - offsetMs);
+      return { ...point, time: formatMinuteLabel(target) };
+    });
+  };
+
+  const buildHourDummyHistory = (): HourPoint[] => {
+    const template: Omit<HourPoint, "time">[] = [
+      { dust: 22, temp: 20, humidity: 48 },
+      { dust: 28, temp: 21, humidity: 50 },
+      { dust: 32, temp: 22, humidity: 52 },
+      { dust: 30, temp: 23, humidity: 51 },
+    ];
+    const now = Date.now();
+    return template.map((point, idx, arr) => {
+      const offsetMs = (arr.length - 1 - idx) * 60 * 60 * 1000;
+      const target = new Date(now - offsetMs);
+      return { ...point, time: formatHourLabel(target) };
+    });
+  };
+
+  const [minuteHistory, setMinuteHistory] = useState<MinutePoint[]>(() =>
+    buildMinuteDummyHistory()
+  );
+  const [hourHistory, setHourHistory] = useState<HourPoint[]>(() =>
+    buildHourDummyHistory()
+  );
   const [rangeMode, setRangeMode] = useState<"minute" | "hour">("minute");
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -132,35 +168,30 @@ const SmartWindowDashboard = () => {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceActions, setVoiceActions] = useState<string[]>([]);
   const recognitionRef = useRef<RecognitionLike | null>(null);
-
-  // 시간 단위 집계 (평균) 계산
-  const hourlyHistory: HourPoint[] = useMemo(() => {
-    const bucket: Record<
-      string,
-      { dust: number[]; temp: number[]; humidity: number[] }
-    > = {};
-    minuteHistory.forEach((p) => {
-      const hour = p.time.split(":")[0];
-      if (!bucket[hour]) bucket[hour] = { dust: [], temp: [], humidity: [] };
-      bucket[hour].dust.push(p.dust);
-      bucket[hour].temp.push(p.temp);
-      bucket[hour].humidity.push(p.humidity);
-    });
-    return Object.entries(bucket)
-      .map(([hour, vals]) => ({
-        time: `${hour}시`,
-        dust: Math.round(
-          vals.dust.reduce((a, b) => a + b, 0) / vals.dust.length
-        ),
-        temp: Math.round(
-          vals.temp.reduce((a, b) => a + b, 0) / vals.temp.length
-        ),
-        humidity: Math.round(
-          vals.humidity.reduce((a, b) => a + b, 0) / vals.humidity.length
-        ),
-      }))
-      .sort((a, b) => a.time.localeCompare(b.time));
-  }, [minuteHistory]);
+  type AggregationAccumulator = {
+    key: string;
+    label: string;
+    count: number;
+    dust: number;
+    temp: number;
+    humidity: number;
+  };
+  const minuteAccumulatorRef = useRef<AggregationAccumulator>({
+    key: "",
+    label: "",
+    count: 0,
+    dust: 0,
+    temp: 0,
+    humidity: 0,
+  });
+  const hourAccumulatorRef = useRef<AggregationAccumulator>({
+    key: "",
+    label: "",
+    count: 0,
+    dust: 0,
+    temp: 0,
+    humidity: 0,
+  });
 
   const rainDrops = useMemo<RainDrop[]>(() => {
     return Array.from({ length: 20 }, (_, idx) => ({
@@ -219,23 +250,71 @@ const SmartWindowDashboard = () => {
         };
         setSensorData(newData);
         const derivedWeather = newData.rain ? "rainy" : "sunny";
-        setWeatherType((prev) => (prev === derivedWeather ? prev : derivedWeather));
+        setWeatherType((prev) =>
+          prev === derivedWeather ? prev : derivedWeather
+        );
 
-        setMinuteHistory((prev) => {
-          const newHistory = [
-            ...prev.slice(-96), // 분 데이터 최대 96개 (최대 1시간 36분)
-            {
-              time: new Date().toLocaleTimeString("ko-KR", {
-                hour: "2-digit",
-                minute: "2-digit",
-              }),
-              dust: newData.dust,
-              temp: newData.temperature,
-              humidity: newData.humidity,
-            },
-          ];
-          return newHistory;
+        const now = new Date();
+        const minuteKey = `${now.getHours()}:${now.getMinutes()}`;
+        const minuteLabel = now.toLocaleTimeString("ko-KR", {
+          hour: "2-digit",
+          minute: "2-digit",
         });
+        const minuteAcc = minuteAccumulatorRef.current;
+        if (
+          minuteAcc.key &&
+          minuteAcc.key !== minuteKey &&
+          minuteAcc.count > 0
+        ) {
+          setMinuteHistory((prev) => [
+            ...prev.slice(-95),
+            {
+              time: minuteAcc.label,
+              dust: Math.round(minuteAcc.dust / minuteAcc.count),
+              temp: Math.round(minuteAcc.temp / minuteAcc.count),
+              humidity: Math.round(minuteAcc.humidity / minuteAcc.count),
+            },
+          ]);
+        }
+        if (minuteAcc.key !== minuteKey) {
+          minuteAcc.key = minuteKey;
+          minuteAcc.label = minuteLabel;
+          minuteAcc.count = 0;
+          minuteAcc.dust = 0;
+          minuteAcc.temp = 0;
+          minuteAcc.humidity = 0;
+        }
+        minuteAcc.count += 1;
+        minuteAcc.dust += newData.dust;
+        minuteAcc.temp += newData.temperature;
+        minuteAcc.humidity += newData.humidity;
+
+        const hourKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+        const hourLabel = `${now.getHours().toString().padStart(2, "0")}시`;
+        const hourAcc = hourAccumulatorRef.current;
+        if (hourAcc.key && hourAcc.key !== hourKey && hourAcc.count > 0) {
+          setHourHistory((prev) => [
+            ...prev.slice(-23),
+            {
+              time: hourAcc.label,
+              dust: Math.round(hourAcc.dust / hourAcc.count),
+              temp: Math.round(hourAcc.temp / hourAcc.count),
+              humidity: Math.round(hourAcc.humidity / hourAcc.count),
+            },
+          ]);
+        }
+        if (hourAcc.key !== hourKey) {
+          hourAcc.key = hourKey;
+          hourAcc.label = hourLabel;
+          hourAcc.count = 0;
+          hourAcc.dust = 0;
+          hourAcc.temp = 0;
+          hourAcc.humidity = 0;
+        }
+        hourAcc.count += 1;
+        hourAcc.dust += newData.dust;
+        hourAcc.temp += newData.temperature;
+        hourAcc.humidity += newData.humidity;
         setWindowOpen(latestWDir === 0); // 0: 열림, 1: 닫힘
         setBlindOpen(latestBDir === 0); // 0: 블라인드 올라감
       } catch (err) {
@@ -245,7 +324,7 @@ const SmartWindowDashboard = () => {
 
     // 최초 1회 즉시 실행 후 주기적 폴링
     fetchAll();
-    const interval = setInterval(fetchAll, 2000); // 1초 주기
+    const interval = setInterval(fetchAll, 2000); // 2초 주기
     return () => clearInterval(interval);
   }, []);
 
@@ -906,7 +985,7 @@ const SmartWindowDashboard = () => {
             </h4>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart
-                data={rangeMode === "minute" ? minuteHistory : hourlyHistory}
+                data={rangeMode === "minute" ? minuteHistory : hourHistory}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" stroke="#9ca3af" />
@@ -927,7 +1006,7 @@ const SmartWindowDashboard = () => {
             <h4 className="text-sm font-semibold text-gray-700 mb-3">온도</h4>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart
-                data={rangeMode === "minute" ? minuteHistory : hourlyHistory}
+                data={rangeMode === "minute" ? minuteHistory : hourHistory}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" stroke="#9ca3af" />
@@ -948,7 +1027,7 @@ const SmartWindowDashboard = () => {
             <h4 className="text-sm font-semibold text-gray-700 mb-3">습도</h4>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart
-                data={rangeMode === "minute" ? minuteHistory : hourlyHistory}
+                data={rangeMode === "minute" ? minuteHistory : hourHistory}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="time" stroke="#9ca3af" />
